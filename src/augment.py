@@ -6,8 +6,6 @@ import json
 jieba.setLogLevel(logging.INFO)
 for i in range(100):
     jieba.add_word(f"FORMULA{i}")
-# https://github.com/chatopera/Synonyms
-# import synonyms
 
 
 class Augment():
@@ -26,11 +24,12 @@ class Augment():
         ]
         self.ques_func_list = [
             self.random_shuffle_clause,
+            # self.random_clause_swap,
             self.random_clause_insert
         ]
         self.p = p
         self.args = args
-
+        # chinese
         self.zh_pattern = re.compile(u'[\u4e00-\u9fa5\。\，\（\）\、\：\；\‘\’\Ⅰ\Ⅱ\Ⅲ\“\”]+')
         self.pure_zh_pattern = re.compile(u'[\u4e00-\u9fa5]+')
         # variable
@@ -42,14 +41,20 @@ class Augment():
         self.synonym_dict = {}
 
         # operator
-        with open('./op_snynonym.json', 'r') as f:
-            op_synonym = json.load(f)
+        op_synonym = [
+            ['+', '-', '*', '^', '^', '**', '/', '\\cdot', '\\times'], # binary operator
+            ['>', '<', '\\leq', '\\geq', '\\neq', '≥', '≤'], # equality
+            ['sin', 'cos', '\\sin', '\\cos', 'tan', '\\tan'], # trigonometric functions
+            ['\\cap', '\\cup', '\\bigcap', '\\bigcup', '∩', '∪'], # set
+            ['\\subseteq', '\\subset', '\\supset', '\\supseteq']
+        ]
         self.op_synonym = {}
         for l in op_synonym:
             for _op in l:
                 self.op_synonym[_op] = l
                 self.op_synonym[_op].remove(_op)
 
+        
         self.sub_ques = ['(I)', '(1)', '（1）', '（I）', '(Ⅰ)', '（Ⅰ）']
 
     # ------- augmentation for text ------------
@@ -94,6 +99,7 @@ class Augment():
                 seleted_word = words[random.randint(0, len(words)-1)]
                 if seleted_word[:7] == 'FORMULA':
                     continue
+                # orginal + top3
                 if seleted_word in self.synonym_dict:
                     synonyms_list = self.synonym_dict[seleted_word]
                 else:
@@ -116,6 +122,7 @@ class Augment():
                 seleted_word = words[random.randint(0, len(words)-1)]
                 if seleted_word[:7] == 'FORMULA':
                     continue
+                # orginal + top3
                 if seleted_word in self.synonym_dict:
                     synonyms_list = self.synonym_dict[seleted_word]
                 else:
@@ -177,7 +184,7 @@ class Augment():
                 self.greek_variable
             ]
             for _l in l:
-                l_formula = self._variable_replace(_l, l_formula)
+                l_formual = self._variable_replace(_l, l_formula)
             return l_formula
 
     def _variable_replace(self, variable_list, l_formula):
@@ -213,7 +220,7 @@ class Augment():
                 for i, f in enumerate(l_formula):
                     l_formula[i] = f.replace(used_v, new_v)
         return l_formula
-
+    
     def num_replace(self, l_formula):
         if random.random() > self.p:
             return l_formula
@@ -226,7 +233,7 @@ class Augment():
                 for i, f in enumerate(l_formula):
                     l_formula[i] = f.replace(used_num, new_num)
             return l_formula
-
+    
     # ------- augmentation for whole question ------------
     def random_shuffle_clause(self, text):
         if random.random() > self.p:
@@ -249,6 +256,33 @@ class Augment():
             else:
                 return text
 
+    def random_clause_swap(self, text):
+        if random.random() > self.p:
+            return text
+        else:
+            flag_i = [text.find(s) for s in self.sub_ques if s in text]
+            if len(flag_i):
+                i = min(flag_i)
+                clauses = re.split('[,.，。]',text[:i])
+                rest = text[i:]
+            else:
+                clauses = re.split('[,.，。]',text)
+                rest = ''
+            if len(clauses[-1]) == 0:
+                clauses = clauses[:-1]
+            if len(clauses) > 1:
+                condition = clauses[:-1]
+                question = clauses[-1]
+                if len(condition) > 1:
+                    index1 = random.randint(0, len(condition) - 1)
+                    index2 = random.randint(0, len(condition) - 1)
+                    while index2 == index1:
+                        index2 = random.randint(0, len(condition) - 1)
+                    condition[index1], condition[index2] = condition[index2], condition[index1]
+                return "，".join(condition + [question]) + rest
+            else:
+                return text
+    
     def random_clause_insert(self, text):
         if random.random() > self.p:
             return text
@@ -285,6 +319,7 @@ class Augment():
                     l.append(f"FORMULA{len(f)}")
                     f.append(text[end:m.start()])
                 else:
+                    # 英文标点
                     l.append(text[end:m.start()])
             l.append(m.group())
             end = m.end()
@@ -301,8 +336,6 @@ class Augment():
         return text
 
     def apply_augment(self, text, method='all'):
-        """
-        """
         text = text.replace(' ', '')
         # Step1
         l_text, l_formula = self.extract_formula(text)
