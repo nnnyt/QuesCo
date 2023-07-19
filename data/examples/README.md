@@ -1,1 +1,1 @@
-We make parts of our datasets publicly avaiable as example data in `question.csv` and the corresponding knowledge hierarchy in `knowledge_tree.csv`.
+We make parts of our datasets publicly avaiable as example data in `question.csv`, along with the associated knowledge hierarchy in `knowledge_tree.json`. `knowledge.csv` is a processed version of knowledge hierarchy for ranking contrastive loss, where each row contains the most fine-grained knowledge and its parents.
